@@ -8,12 +8,12 @@ import random
 
 
 # Settings
-RATE = 0.5
-domain = "https://sv.wikipedia.org"
+RATE = 0.35
+domain = "https://de.wikipedia.org"
 starting_url = "/wiki/Main_Page"
-filepath = "./sv_wikidict.txt"
+filepath = "./de_wikidict.txt"
 banned_in_url = ["_talk:", "Special:", "User:", "Talk:", "Wikipedia:", "Help:", "Template:", "File:"]
-word_matcher = re.compile(r"(?:^|(?<= ))[a-zåäöA-ZÅÄÖ0-9]+(?= |$)")
+word_matcher = re.compile(r"(?:^|(?<= ))[a-zåäöñíßüA-ZÅÄÖÑÍẞÜ0-9]+(?= |$)")
 
 
 encountered = Counter()
@@ -24,25 +24,28 @@ total_words = 0
 
 new_words = []
 
+
 class LinksAndWords(HTMLParser):
     def __init__(self):
         super().__init__()
         self.inContent = False
-        self.depth = 0
+        self.depth = 0  # Variables for reading only body of Wikipedia article
 
     def handle_starttag(self, tag, attrs):
         if self.inContent and tag == "div":
             self.depth += 1
 
         for attr in attrs:
+            # Start word extraction
             if tag == "div" and attr[0] == "id" and attr[1] == "content":
                 self.inContent = True
 
+            # Extract urls from site
             if attr[0] == "href" and attr[1].startswith("/wiki/"):
                 url = attr[1].split("#")[0]
                 if any(x in url for x in banned_in_url):
                     continue
-                if url.endswith((".js", ".jpg", ".png", ".pdf", ".css")):
+                if url.endswith((".js", ".jpg", ".png", ".pdf", ".css", ".svg")):
                     continue
                 if attr[1] not in registered_urls:
                     url_queue.append(url)
@@ -67,6 +70,9 @@ class LinksAndWords(HTMLParser):
                 if encountered[word] == 1:
                     new_words.append(word)
 
+    def error(self, message):
+        print("HTML parser error: ", message)
+
 
 def save2file():
     all_words = encountered.most_common()
@@ -75,8 +81,10 @@ def save2file():
             f.write("{}, {}, {}\n".format(word, log(occurrences/total_words), occurrences))
 
 
+# Initiate parser
 parser = LinksAndWords()
 
+# Start loop
 url_queue.append(starting_url)
 while url_queue:
     sub_domain = url_queue.pop(random.randrange(len(url_queue)))

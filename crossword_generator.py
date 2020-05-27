@@ -6,10 +6,12 @@ import time
 os.environ.setdefault('ESCDELAY', '25')
 dict_dict = {}
 
+# What dictionary to use
+dictionary_path = "./en_wikidict.txt"
 
-def load_dict():
-    path = "./en_wikidict.txt"
 
+def load_dict(path):
+    # Load dictionary from file
     _words = []
     with open(path, "r") as file:
         for line in file:
@@ -20,17 +22,19 @@ def load_dict():
     return _words
 
 
-words = load_dict()
+# Load at once
+words = load_dict(dictionary_path)
 
 
-def suggest_word(guide, after):
+def suggest_word(query, after):
+    # Returns list of words that matches query. After parameter searches for n-additional characters
     global words
     counter = 0
     after += 1
     suggested = []
-    start_time = time.time_ns()
+    start_time = time.time()
     while counter < after:
-        known = guide + [None] * counter
+        known = query + [None] * counter
         counter += 1
         for word in words:
             if len(word) == len(known):
@@ -43,13 +47,14 @@ def suggest_word(guide, after):
                         break
                 else:
                     suggested.append(word)
-    return suggested, (time.time_ns()-start_time)/1e6
+    return suggested, (time.time()-start_time)*1e3
 
 
-# Start GUI
+# Ask user for dimensions
 width = int(input("Width: "))
 height = int(input("Height: "))
 
+# Start curses
 stdscr = curses.initscr()
 curses.noecho()
 curses.cbreak()
@@ -61,21 +66,24 @@ def main(stdscr):
     stdscr.clear()
     stdscr.refresh()
 
+    # Initiate window
     win = curses.newwin(height+2, width+2, 0, 0)
     win.box()
     win.move(1, 1)
     win.keypad(True)
     win.refresh()
 
+    # Initiate suggestion color pair
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
 
     def _print(s, p, attr=0):
+        # Prints s at given position
         op = win.getyx()
         win.move(p[0], p[1])
         try:
             win.addstr(str(s), attr)
         except curses.error:
-            pass
+            pass  # This happens when trying to print off-screen
         win.move(op[0], op[1])
 
     def select(o):
@@ -104,10 +112,11 @@ def main(stdscr):
     select_typing = False
 
     while True:
-        k = win.getch()
+        k = win.getch()  # Get user action
         if k in [curses.KEY_RIGHT, curses.KEY_LEFT, curses.KEY_DOWN, curses.KEY_UP]:
-            deselect(selected)
+            deselect(selected)  # Deselect all
 
+        # Move cursor if within bounds:
         if k == curses.KEY_RIGHT:
             if win.getyx()[1] != width:
                 win.move(win.getyx()[0], win.getyx()[1]+1)
@@ -124,7 +133,7 @@ def main(stdscr):
             if win.getyx()[0] != 1:
                 win.move(win.getyx()[0]-1, win.getyx()[1])
                 select_typing = False
-        elif k == 27:
+        elif k == 27:  # Escape key to deselect or quit program
             if selected:
                 deselect(selected)
             else:
@@ -150,9 +159,9 @@ def main(stdscr):
             else:
                 select(new_pos)
 
-        elif k == ord('\t'):
+        elif k == ord('\t'):  # Start suggesting words for active selection
             if selected:
-                # Suggest words
+                # Build query
                 chars = []
                 for pc in selected:
                     char = chr(win.inch(pc[0], pc[1]) & 0xFF)
@@ -161,11 +170,13 @@ def main(stdscr):
                     chars.append(char)
                 if None not in chars:
                     continue
+                # Query words
                 suggested, exec_time = suggest_word(chars, 0)
                 # Without alphabetical sort, will be order in file (commonality)
                 # suggested.sort()
                 _print(str(exec_time)+"ms", (0, 0))
 
+                # If found no suggestions
                 if not suggested:
                     win.box()
                     _print("NO SUGGESTION", (height + 1, 1), curses.A_BOLD)
@@ -173,9 +184,10 @@ def main(stdscr):
 
                 iterated_words = 0
                 keep_word = False
-                while True:
+                while True:  # Iterate through found words
                     win.box()
                     suggested_word = suggested[iterated_words]
+                    # Print on screen in right color, maybe can be done with _print
                     for cp, ch in enumerate(suggested_word):
                         win.move(selected[cp][0], selected[cp][1])
                         if chars[cp] is None:
@@ -184,23 +196,26 @@ def main(stdscr):
                             else:
                                 win.addstr(ch, curses.color_pair(1) | curses.A_STANDOUT)
                     win.move(selected[0][0], selected[0][1])
+                    # Print extra info in lower left edge
                     word_rate = int(1/(10**dict_dict[suggested_word][0]))
                     _print(suggested_word+", word rate: 1/"+str(word_rate), (height+1, 1))
                     win.refresh()
+
+                    # Get user key
                     k = win.getch()
-                    if k == 10:  # Enter key
+                    if k == 10:  # Enter key to break loop and keep word
                         keep_word = True
-                    elif k == ord('\t'):
+                    elif k == ord('\t'):  # Tab to get next word
                         iterated_words = (iterated_words+1) % len(suggested)
                         continue
-                    elif k == curses.KEY_STAB:
+                    elif k == curses.KEY_STAB:  # Shift tab to go back, FIXME
                         iterated_words = (len(suggested) + iterated_words - 1) % len(suggested)
                         continue
                     break
 
                 if keep_word:
                     deselect(selected)
-                else:
+                else:  # Reset to old characters
                     win.box()
                     for cp, ch in enumerate(chars):
                         win.move(selected[cp][0], selected[cp][1])
@@ -208,17 +223,17 @@ def main(stdscr):
                             win.addch(" ", curses.A_STANDOUT)
                         else:
                             win.addch(ch, curses.A_STANDOUT)
-        elif k == curses.KEY_BACKSPACE or k == curses.KEY_DC:
+        elif k == curses.KEY_BACKSPACE or k == curses.KEY_DC:  # Delete all selected
             if selected:
                 for cp in selected:
                     win.addch(cp[0], cp[1], " ")
             else:
                 win.addstr(" ")
                 win.move(win.getyx()[0], win.getyx()[1] - 1)
-        elif k is not None:
+        elif k is not None:  # Add manually by typing
             try:
                 if chr(k).isalnum():
-                    if selected:
+                    if selected:  # Add rolling within selection
                         if not select_typing:
                             select_typing = True
                             win.move(selected[0][0], selected[0][1])
@@ -236,16 +251,16 @@ def main(stdscr):
                         win.move(win.getyx()[0], win.getyx()[1]-1)
             except ValueError as e:
                 pass
-                #raise e
-            #win.addstr(str(k))  # Check raw key-code
 
         win.refresh()
 
     stdscr.refresh()
 
 
+# Start program
 wrapper(main)
 
+# Quit program
 curses.nocbreak()
 stdscr.keypad(False)
 curses.echo()
