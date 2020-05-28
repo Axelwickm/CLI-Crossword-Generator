@@ -8,10 +8,10 @@ import random
 
 
 # Settings
-RATE = 0.35
-domain = "https://de.wikipedia.org"
+RATE = 0.8
+domain = "https://sv.wikipedia.org"
 starting_url = "/wiki/Main_Page"
-filepath = "./de_wikidict.txt"
+filepath = "dictionaries/sv_wikidict.txt"
 banned_in_url = ["_talk:", "Special:", "User:", "Talk:", "Wikipedia:", "Help:", "Template:", "File:"]
 word_matcher = re.compile(r"(?:^|(?<= ))[a-zåäöñíßüA-ZÅÄÖÑÍẞÜ0-9]+(?= |$)")
 

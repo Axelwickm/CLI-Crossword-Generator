@@ -7,7 +7,7 @@ os.environ.setdefault('ESCDELAY', '25')
 dict_dict = {}
 
 # What dictionary to use
-dictionary_path = "./en_wikidict.txt"
+dictionary_path = "dictionaries/sv_wikidict.txt"
 
 
 def load_dict(path):
